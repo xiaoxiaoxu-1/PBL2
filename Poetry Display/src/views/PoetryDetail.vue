@@ -150,7 +150,7 @@ onMounted(() => {
         <h2 class="section-title">相关推荐</h2>
         <div class="related-grid">
           <RouterLink
-            v-for="relatedPoetry in poetryStore.filteredPoetries.filter(p => p.id !== poetry.id).slice(0, 3)"
+            v-for="relatedPoetry in poetryStore.poetries.filter(p => p.id !== poetryId).slice(0, 3)"
             :key="relatedPoetry.id"
             :to="`/poetry/${relatedPoetry.id}`"
             class="related-item"
