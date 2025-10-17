@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
 import NavBar from './components/NavBar.vue'
+import AIChatAssistant from './components/AIChatAssistant.vue'
+import { useAuthStore } from '@/stores/auth'
+import { onMounted } from 'vue'
+
+const authStore = useAuthStore()
+
+onMounted(() => {
+  authStore.initUser()
+})
 </script>
 
 <template>
@@ -9,6 +18,7 @@ import NavBar from './components/NavBar.vue'
     <main class="main-content">
       <RouterView />
     </main>
+    <AIChatAssistant />
   </div>
 </template>
 

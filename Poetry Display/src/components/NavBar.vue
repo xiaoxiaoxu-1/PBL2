@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
+const authStore = useAuthStore()
 const isMobileMenuOpen = ref(false)
+
+const user = computed(() => authStore.user)
 
 const toggleMobileMenu = () => {
   isMobileMenuOpen.value = !isMobileMenuOpen.value
@@ -11,6 +15,15 @@ const toggleMobileMenu = () => {
 
 const closeMobileMenu = () => {
   isMobileMenuOpen.value = false
+}
+
+const handleLogout = async () => {
+  try {
+    await authStore.signOut()
+    closeMobileMenu()
+  } catch (error) {
+    console.error('退出登录失败:', error)
+  }
 }
 </script>
 
@@ -55,6 +68,29 @@ const closeMobileMenu = () => {
         >
           关于我们
         </RouterLink>
+        
+        <!-- 用户认证菜单 -->
+        <div v-if="user" class="user-menu">
+          <RouterLink 
+            to="/profile" 
+            class="nav-link user-link"
+            :class="{ active: route.name === 'Profile' }"
+          >
+            {{ user.email }}
+          </RouterLink>
+          <button @click="handleLogout" class="logout-btn">
+            退出
+          </button>
+        </div>
+        <div v-else class="auth-menu">
+          <RouterLink 
+            to="/login" 
+            class="nav-link auth-link"
+            :class="{ active: route.name === 'Login' }"
+          >
+            登录/注册
+          </RouterLink>
+        </div>
       </div>
 
       <!-- 移动端菜单按钮 -->
@@ -104,6 +140,31 @@ const closeMobileMenu = () => {
           >
             关于我们
           </RouterLink>
+          
+          <!-- 移动端用户认证菜单 -->
+          <div v-if="user" class="mobile-user-menu">
+            <RouterLink 
+              to="/profile" 
+              class="mobile-nav-link"
+              :class="{ active: route.name === 'Profile' }"
+              @click="closeMobileMenu"
+            >
+              个人资料
+            </RouterLink>
+            <button @click="handleLogout" class="mobile-logout-btn">
+              退出登录
+            </button>
+          </div>
+          <div v-else class="mobile-auth-menu">
+            <RouterLink 
+              to="/login" 
+              class="mobile-nav-link"
+              :class="{ active: route.name === 'Login' }"
+              @click="closeMobileMenu"
+            >
+              登录/注册
+            </RouterLink>
+          </div>
         </div>
       </div>
     </div>
@@ -274,6 +335,66 @@ const closeMobileMenu = () => {
   background-color: rgba(52, 152, 219, 0.1);
   color: var(--secondary-color);
   border-left: 4px solid var(--secondary-color);
+}
+
+/* 用户菜单样式 */
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.user-link {
+  color: var(--success-color);
+  font-weight: 600;
+}
+
+.logout-btn {
+  background: var(--danger-color);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: var(--transition);
+}
+
+.logout-btn:hover {
+  background: #c0392b;
+}
+
+.auth-link {
+  background: var(--success-color);
+  color: white;
+}
+
+.auth-link:hover {
+  background: #27ae60;
+  color: white;
+}
+
+/* 移动端用户菜单 */
+.mobile-user-menu,
+.mobile-auth-menu {
+  border-top: 1px solid var(--border-color);
+}
+
+.mobile-logout-btn {
+  display: block;
+  width: 100%;
+  background: var(--danger-color);
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  text-align: left;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: var(--transition);
+}
+
+.mobile-logout-btn:hover {
+  background: #c0392b;
 }
 
 /* 响应式设计 */

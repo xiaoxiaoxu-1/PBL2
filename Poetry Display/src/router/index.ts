@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Home from '@/views/Home.vue'
+import { useAuthStore } from '@/stores/auth'
 
 // 路由配置
 const routes = [
@@ -32,7 +33,26 @@ const routes = [
     name: 'CreatePoetry',
     component: () => import('@/views/CreatePoetry.vue'),
     meta: {
-      title: '创作诗歌 - Poetry Display'
+      title: '创作诗歌 - Poetry Display',
+      requiresAuth: true
+    }
+  },
+  {
+    path: '/login',
+    name: 'Login',
+    component: () => import('@/views/Login.vue'),
+    meta: {
+      title: '登录/注册 - Poetry Display',
+      requiresGuest: true
+    }
+  },
+  {
+    path: '/profile',
+    name: 'Profile',
+    component: () => import('@/views/Profile.vue'),
+    meta: {
+      title: '个人资料 - Poetry Display',
+      requiresAuth: true
     }
   },
   {
@@ -67,12 +87,30 @@ const router = createRouter({
 })
 
 // 全局路由守卫
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, from, next) => {
+  const authStore = useAuthStore()
+  
+  // 初始化用户状态
+  if (!authStore.user) {
+    await authStore.initUser()
+  }
+
   // 设置页面标题
   if (to.meta?.title) {
     document.title = to.meta.title as string
   }
-  
+
+  // 检查认证要求
+  if (to.meta?.requiresAuth && !authStore.user) {
+    next('/login')
+    return
+  }
+
+  if (to.meta?.requiresGuest && authStore.user) {
+    next('/')
+    return
+  }
+
   next()
 })
 

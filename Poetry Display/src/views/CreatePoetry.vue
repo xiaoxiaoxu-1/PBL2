@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePoetryStore, POETRY_CATEGORIES } from '@/stores/poetry'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
 const poetryStore = usePoetryStore()
+const authStore = useAuthStore()
 
 // 表单数据
 const form = reactive({
@@ -19,6 +21,7 @@ const form = reactive({
 const isSubmitting = ref(false)
 const errors = ref<Record<string, string>>({})
 const tagInput = ref('')
+const isLoggedIn = ref(false)
 
 // 添加标签
 const addTag = () => {
@@ -71,8 +74,23 @@ const validateForm = () => {
   return Object.keys(errors.value).length === 0
 }
 
+// 检查登录状态
+onMounted(() => {
+  isLoggedIn.value = !!authStore.user
+  if (!isLoggedIn.value) {
+    alert('请先登录后再发布诗歌')
+    router.push('/login')
+  }
+})
+
 // 提交表单
 const handleSubmit = async () => {
+  if (!isLoggedIn.value) {
+    alert('请先登录后再发布诗歌')
+    router.push('/login')
+    return
+  }
+  
   if (!validateForm()) {
     return
   }
@@ -82,7 +100,7 @@ const handleSubmit = async () => {
   try {
     await new Promise(resolve => setTimeout(resolve, 1000))
     
-    const newPoetry = poetryStore.addPoetry({
+    const newPoetry = await poetryStore.addPoetry({
       title: form.title.trim(),
       content: form.content.trim(),
       author: form.author.trim(),
@@ -100,7 +118,9 @@ const handleSubmit = async () => {
     }
   } catch (error) {
     console.error('创建失败:', error)
-    alert('创建失败，请重试')
+    // 显示具体的错误信息
+    const errorMessage = error instanceof Error ? error.message : '创建失败，请重试'
+    alert(`创建失败: ${errorMessage}`)
   } finally {
     isSubmitting.value = false
   }
@@ -146,9 +166,17 @@ const loadDraft = () => {
       <div class="page-header">
         <h1 class="page-title">创作诗歌</h1>
         <p class="page-description">用文字编织情感，用诗歌记录生活的美好瞬间。</p>
+        <div v-if="!isLoggedIn" class="login-prompt">
+          <p>请先登录后再发布诗歌</p>
+          <button @click="router.push('/login')" class="btn btn-primary">立即登录</button>
+        </div>
       </div>
 
-      <form @submit.prevent="handleSubmit" class="create-form">
+      <div v-if="!isLoggedIn" class="login-required">
+        <p>您需要登录后才能发布诗歌</p>
+      </div>
+
+      <form v-if="isLoggedIn" @submit.prevent="handleSubmit" class="create-form">
         <div class="form-section">
           <div class="form-group">
             <label for="title" class="form-label">
@@ -327,11 +355,43 @@ const loadDraft = () => {
 .action-group { display: flex; gap: 1rem; flex-wrap: wrap; }
 .submit-btn { background-color: var(--secondary-color); }
 .submit-btn:disabled { background-color: var(--text-light); cursor: not-allowed; }
+.login-prompt {
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: var(--border-radius);
+  padding: 1.5rem;
+  text-align: center;
+  margin-top: 1rem;
+}
+
+.login-prompt p {
+  margin-bottom: 1rem;
+  color: #856404;
+  font-weight: 500;
+}
+
+.login-required {
+  text-align: center;
+  padding: 3rem;
+  background-color: var(--card-background);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  margin-top: 2rem;
+}
+
+.login-required p {
+  font-size: 1.2rem;
+  color: var(--text-light);
+  margin-bottom: 1.5rem;
+}
+
 @media (max-width: 768px) {
   .create-form { padding: 2rem 1.5rem; }
   .page-title { font-size: 2rem; }
   .form-actions { flex-direction: column; align-items: stretch; }
   .action-group { justify-content: center; }
   .submit-btn { order: 1; margin-bottom: 1rem; }
+  .login-prompt { padding: 1rem; }
+  .login-required { padding: 2rem 1rem; }
 }
 </style>

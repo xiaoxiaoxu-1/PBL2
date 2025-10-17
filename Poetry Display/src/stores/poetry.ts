@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
+import { supabase } from '../lib/supabase'
+import { useAuthStore } from './auth'
 
 // 诗歌数据类型定义
 export interface Poetry {
@@ -29,9 +31,6 @@ export const POETRY_CATEGORIES = [
 
 export type PoetryCategory = typeof POETRY_CATEGORIES[number]
 
-// 本地存储键名
-const STORAGE_KEY = 'poetry-app-data'
-
 // 数据验证函数
 const validatePoetryData = (data: Partial<Poetry>): string[] => {
   const errors: string[] = []
@@ -55,22 +54,88 @@ const validatePoetryData = (data: Partial<Poetry>): string[] => {
   return errors
 }
 
-// 本地存储工具函数
-const saveToStorage = (data: Poetry[]) => {
+// Supabase数据操作函数
+const loadFromSupabase = async (): Promise<Poetry[]> => {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    const { data, error } = await supabase
+      .from('poetries')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    // 转换数据格式
+    return data.map(item => ({
+      id: item.id,
+      title: item.title,
+      content: item.content,
+      author: item.author,
+      category: item.category,
+      tags: item.tags,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+      likes: item.likes,
+      views: item.views
+    }))
   } catch (error) {
-    console.error('保存数据到本地存储失败:', error)
+    console.error('从Supabase加载数据失败:', error)
+    return []
   }
 }
 
-const loadFromStorage = (): Poetry[] => {
+const saveToSupabase = async (poetry: Poetry): Promise<Poetry | null> => {
   try {
-    const data = localStorage.getItem(STORAGE_KEY)
-    return data ? JSON.parse(data) : []
+    const authStore = useAuthStore()
+    const user = authStore.user
+    
+    const { data, error } = await supabase
+      .from('poetries')
+      .insert({
+        title: poetry.title,
+        content: poetry.content,
+        author: poetry.author,
+        category: poetry.category,
+        tags: poetry.tags,
+        created_at: poetry.createdAt,
+        updated_at: poetry.updatedAt,
+        likes: poetry.likes,
+        views: poetry.views,
+        user_id: user?.id || null
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+    return data ? {
+      id: data.id,
+      title: data.title,
+      content: data.content,
+      author: data.author,
+      category: data.category,
+      tags: data.tags,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      likes: data.likes,
+      views: data.views
+    } : null
   } catch (error) {
-    console.error('从本地存储加载数据失败:', error)
-    return []
+    console.error('保存数据到Supabase失败:', error)
+    return null
+  }
+}
+
+const deleteFromSupabase = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('poetries')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
+    return true
+  } catch (error) {
+    console.error('从Supabase删除数据失败:', error)
+    return false
   }
 }
 
@@ -117,16 +182,17 @@ export const usePoetryStore = defineStore('poetry', () => {
   })
 
   // 方法
-  const generateId = (): string => {
-    // 使用时间戳 + 随机数 + 计数器生成更安全的ID
-    const timestamp = Date.now().toString(36)
-    const random = Math.random().toString(36).substring(2, 15)
-    const counter = poetries.value.length.toString(36)
-    return `poetry_${timestamp}_${random}_${counter}`
-  }
+  // 移除自定义ID生成，使用Supabase自动生成的UUID
 
-  const addPoetry = (poetryData: Omit<Poetry, 'id' | 'createdAt' | 'updatedAt' | 'likes' | 'views'>) => {
+  const addPoetry = async (poetryData: Omit<Poetry, 'id' | 'createdAt' | 'updatedAt' | 'likes' | 'views'>) => {
     try {
+      // 检查用户是否登录
+      const authStore = useAuthStore()
+      if (!authStore.user) {
+        error.value = '请先登录后再发布诗歌'
+        return null
+      }
+
       // 数据验证
       const validationErrors = validatePoetryData(poetryData)
       if (validationErrors.length > 0) {
@@ -134,29 +200,35 @@ export const usePoetryStore = defineStore('poetry', () => {
         return null
       }
 
-      const newPoetry: Poetry = {
+      const newPoetry: Omit<Poetry, 'id'> = {
         ...poetryData,
         title: poetryData.title.trim(),
         content: poetryData.content.trim(),
         author: poetryData.author.trim(),
         tags: poetryData.tags.filter(tag => tag.trim() !== ''),
-        id: generateId(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         likes: 0,
         views: 0
       }
       
-      poetries.value.unshift(newPoetry)
-      error.value = null
-      return newPoetry
+      // 保存到Supabase
+      const savedPoetry = await saveToSupabase(newPoetry as Poetry)
+      if (savedPoetry) {
+        poetries.value.unshift(savedPoetry)
+        error.value = null
+        return savedPoetry
+      } else {
+        error.value = '保存到数据库失败'
+        return null
+      }
     } catch (err) {
       error.value = '添加诗歌失败: ' + (err instanceof Error ? err.message : '未知错误')
       return null
     }
   }
 
-  const updatePoetry = (id: string, updates: Partial<Poetry>) => {
+  const updatePoetry = async (id: string, updates: Partial<Poetry>) => {
     try {
       const index = poetries.value.findIndex(p => p.id === id)
       if (index === -1) {
@@ -181,21 +253,46 @@ export const usePoetryStore = defineStore('poetry', () => {
       if (cleanUpdates.author) cleanUpdates.author = cleanUpdates.author.trim()
       if (cleanUpdates.tags) cleanUpdates.tags = cleanUpdates.tags.filter(tag => tag.trim() !== '')
 
-      poetries.value[index] = {
-        ...poetries.value[index],
-        ...cleanUpdates,
-        updatedAt: new Date().toISOString()
-      }
+      // 直接更新到Supabase
+      const { data, error: updateError } = await supabase
+        .from('poetries')
+        .update({
+          ...cleanUpdates,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (updateError) throw updateError
       
-      error.value = null
-      return poetries.value[index]
+      if (data) {
+        const savedPoetry = {
+          id: data.id,
+          title: data.title,
+          content: data.content,
+          author: data.author,
+          category: data.category,
+          tags: data.tags,
+          createdAt: data.created_at,
+          updatedAt: data.updated_at,
+          likes: data.likes,
+          views: data.views
+        }
+        poetries.value[index] = savedPoetry
+        error.value = null
+        return savedPoetry
+      } else {
+        error.value = '更新数据库失败'
+        return null
+      }
     } catch (err) {
       error.value = '更新诗歌失败: ' + (err instanceof Error ? err.message : '未知错误')
       return null
     }
   }
 
-  const deletePoetry = (id: string) => {
+  const deletePoetry = async (id: string) => {
     try {
       const index = poetries.value.findIndex(p => p.id === id)
       if (index === -1) {
@@ -203,9 +300,16 @@ export const usePoetryStore = defineStore('poetry', () => {
         return false
       }
 
-      poetries.value.splice(index, 1)
-      error.value = null
-      return true
+      // 从Supabase删除
+      const success = await deleteFromSupabase(id)
+      if (success) {
+        poetries.value.splice(index, 1)
+        error.value = null
+        return true
+      } else {
+        error.value = '从数据库删除失败'
+        return false
+      }
     } catch (err) {
       error.value = '删除诗歌失败: ' + (err instanceof Error ? err.message : '未知错误')
       return false
@@ -247,11 +351,11 @@ export const usePoetryStore = defineStore('poetry', () => {
     selectedCategory.value = ''
   }
 
-  // 从本地存储加载数据
-  const loadData = () => {
+  // 从Supabase加载数据
+  const loadData = async () => {
     try {
       loading.value = true
-      const savedData = loadFromStorage()
+      const savedData = await loadFromSupabase()
       poetries.value = savedData
       error.value = null
     } catch (err) {
@@ -261,10 +365,9 @@ export const usePoetryStore = defineStore('poetry', () => {
     }
   }
 
-  // 清除所有数据
+  // 清除所有数据（仅清除本地缓存，不删除数据库数据）
   const clearAllData = () => {
     poetries.value = []
-    localStorage.removeItem(STORAGE_KEY)
     error.value = null
   }
 
@@ -350,20 +453,6 @@ export const usePoetryStore = defineStore('poetry', () => {
 
   // 初始化数据加载
   loadData()
-  
-  // 如果没有数据，初始化示例数据
-  if (poetries.value.length === 0) {
-    initSampleData()
-  }
-
-  // 监听数据变化，自动保存到本地存储
-  watch(
-    poetries,
-    (newPoetries) => {
-      saveToStorage(newPoetries)
-    },
-    { deep: true }
-  )
 
   return {
     // 状态
