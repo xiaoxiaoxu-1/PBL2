@@ -1,0 +1,4 @@
+
+SUPABASE_URL=https://muzyfqxxafqqqgaqvhlu.supabase.co
+SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11enlmcXh4YWZxcXFnYXF2aGx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA0Njg2MzQsImV4cCI6MjA3NjA0NDYzNH0.6rLJWjKrjW5dGFjWrAAAvJCtXmJG1a91gJYqrP5EELk
+        

@@ -1,0 +1,67 @@
+{
+  "name": "AI诗歌助手工作流",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "webhook/ai-chat",
+        "responseMode": "responseNode"
+      },
+      "id": "webhook-node",
+      "name": "AI聊天Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { message, timestamp, sessionId, apiEndpoints } = $input.first().json;\n\n// 使用您提供的API端点进行智能处理\nlet aiResponse = '';\n\ntry {\n  // 方案1: 调用您提供的POST端点进行AI处理\n  if (apiEndpoints && apiEndpoints.post) {\n    const customResponse = await $fetch(`https://your-ai-service.com/api/${apiEndpoints.post}`, {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json',\n        'Authorization': `Bearer ${process.env.CUSTOM_AI_API_KEY}`\n      },\n      body: JSON.stringify({\n        prompt: message,\n        context: '诗歌创作助手',\n        max_tokens: 500\n      })\n    });\n    aiResponse = customResponse.result || customResponse.text;\n  }\n  \n  // 方案2: 备用AI服务（OpenAI）\n  if (!aiResponse && process.env.OPENAI_API_KEY) {\n    const openaiResponse = await $fetch('https://api.openai.com/v1/chat/completions', {\n      method: 'POST',\n      headers: {\n        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,\n        'Content-Type': 'application/json'\n      },\n      body: JSON.stringify({\n        model: 'gpt-3.5-turbo',\n        messages: [\n          {\n            role: 'system',\n            content: '你是一个专业的诗歌助手，帮助用户了解诗歌创作、欣赏诗歌作品、解答诗歌相关问题。回答要专业、友好、有帮助。'\n          },\n          {\n            role: 'user',\n            content: message\n          }\n        ],\n        max_tokens: 500,\n        temperature: 0.7\n      })\n    });\n    aiResponse = openaiResponse.choices[0].message.content;\n  }\n  \n  // 方案3: 默认回复\n  if (!aiResponse) {\n    aiResponse = `感谢您的提问！关于\"${message}\"，作为诗歌助手，我可以帮您分析诗歌、提供创作建议。请告诉我您具体想了解什么？`;\n  }\n  \n} catch (error) {\n  console.error('AI处理错误:', error);\n  aiResponse = '抱歉，AI服务暂时不可用。请稍后重试。';\n}\n\n// 返回AI回复\nreturn {\n  response: aiResponse,\n  timestamp: new Date().toISOString(),\n  sessionId: sessionId,\n  endpointsUsed: apiEndpoints ? '自定义API' : '备用服务'\n};"
+      },
+      "id": "ai-processor",
+      "name": "AI处理器",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "response-node",
+      "name": "响应节点",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 300]
+    }
+  ],
+  "connections": {
+    "AI聊天Webhook": {
+      "main": [
+        [
+          {
+            "node": "AI处理器",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI处理器": {
+      "main": [
+        [
+          {
+            "node": "响应节点",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "triggerCount": 0,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "pinData": null
+}
