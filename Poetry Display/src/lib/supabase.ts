@@ -1,8 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
 
+// // 从环境变量获取配置
+// const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+// const supabaseKey = import.meta.env.VITE_SUPABASE_KEY
+
 // 从环境变量获取配置
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseKey = import.meta.env.VITE_SUPABASE_KEY
+const supabaseUrl = "https://muzyfqxxafqqqgaqvhlu.supabase.co"
+const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11enlmcXh4YWZxcXFnYXF2aGx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA0Njg2MzQsImV4cCI6MjA3NjA0NDYzNH0.6rLJWjKrjW5dGFjWrAAAvJCtXmJG1a91gJYqrP5EELk"
+
 
 // 验证环境变量
 if (!supabaseUrl) {
